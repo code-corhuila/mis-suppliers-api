@@ -21,3 +21,9 @@ jobs:
         run: |
           python -m pip install -r requirements-dev.txt
           python -m pytest -q
+      - name: Check native persistence script syntax
+        shell: pwsh
+        run: |
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'tests/Test-Persistence.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count) { throw ($errors | Out-String) }

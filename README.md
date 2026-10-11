@@ -27,7 +27,7 @@ Full policy: `00-governance/branching-policy.md` in `mis-docs`.
 ## Publicacion inicial del nucleo HU-PRV-001
 
 Python 3.12. app/core.py publica validacion, normalizacion, huella y puertos sin
-importar FastAPI, MongoDB ni JWT. El servidor, persistencia y recepciones siguen
+importar FastAPI, MongoDB ni JWT. El servidor y recepciones siguen
 en la preparacion local y se publicaran despues; este clon aun no ofrece HTTP.
 
 ```powershell
@@ -39,3 +39,18 @@ Treinta casos unitarios, sin DB/JWKS ni secretos. No prueban replay persistente,
 roles, transacciones o permisos MongoDB. Dependencias fijadas iguales a la
 preparacion local; algunas solo seran utilizadas por los adaptadores posteriores.
 Decision y limites: [ADR-PRV-CORE-001](docs/ADR-PRV-CORE-001.md).
+
+## Persistencia MongoDB
+
+app/mongo.py implementa proveedor + snapshot en una transaccion. No crea estructura:
+requiere las migraciones oficiales. Decision: [ADR-PRV-PERSISTENCE-001](docs/ADR-PRV-PERSISTENCE-001.md).
+pytest sin configuracion ejecuta 37 casos y omite cuatro nativos; CI no usa secretos.
+Para ejecutar los 41 casos con PowerShell 7, Docker y replica set desechable:
+
+```powershell
+pwsh -NoProfile -File ./tests/Test-Persistence.ps1 -InfraRoot 'D:\descargas\pago 2\mis-infra-postgres' -MongoInfraRoot 'D:\descargas\pago 2\mis-infra-mongo' -SuppliersDbRoot '<clon-oficial-mis-suppliers-db>'
+```
+
+Usar el clon DB publicado que admite MIS_INFRA_MONGO_PATH. El script levanta un
+proyecto aleatorio, aplica migraciones y elimina solo sus volumenes al terminar.
+No toca datos dev/qa/main ni renueva credenciales. Aun no publica servidor HTTP.

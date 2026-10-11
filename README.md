@@ -27,7 +27,7 @@ Full policy: `00-governance/branching-policy.md` in `mis-docs`.
 ## Publicacion inicial del nucleo HU-PRV-001
 
 Python 3.12. app/core.py publica validacion, normalizacion, huella y puertos sin
-importar FastAPI, MongoDB ni JWT. El servidor y las capas HTTP/persistencia de recepciones siguen
+importar FastAPI, MongoDB ni JWT. El servidor y las rutas HTTP de recepciones siguen
 en la preparacion local y se publicaran despues; este clon aun no ofrece HTTP.
 
 ```powershell
@@ -44,7 +44,7 @@ Decision y limites: [ADR-PRV-CORE-001](docs/ADR-PRV-CORE-001.md).
 
 app/mongo.py implementa proveedor + snapshot en una transaccion. No crea estructura:
 requiere las migraciones oficiales. Decision: [ADR-PRV-PERSISTENCE-001](docs/ADR-PRV-PERSISTENCE-001.md).
-pytest sin configuracion omite cuatro casos nativos; CI no usa secretos de DB.
+pytest sin configuracion omite los casos nativos; CI no usa secretos de DB.
 Para ejecutar tambien los nativos con PowerShell 7, Docker y replica set desechable:
 
 ```powershell
@@ -69,8 +69,17 @@ cuya publicacion se completa antes de integrar el servidor. Despliegue activo in
 app/receipts.py publica documento normalizado y puertos de participante para
 preparar, consultar, confirmar/anular. No contiene persistencia ni reglas de roles
 HTTP y no modifica stock. [Decision](docs/ADR-PRV-RECEIPT-CORE-001.md).
-31 casos de dominio/servicio se suman a la suite: 97 passed y cuatro nativos
-omitidos al ejecutar pytest sin DB. Las pruebas mezcladas de HTTP locales se
+31 casos de dominio/servicio se suman a la suite, sin DB/JWKS. Las pruebas HTTP locales se
 publicaran con servidor/router, sin imports rotos en esta etapa.
 La identidad del servicio, estados/auditoria, idempotencia transaccional y saga
 requieren sus adaptadores y aceptacion real; este bloque no cierra HU-WFL-001.
+
+## Persistencia de recepciones
+
+app/mongo_receipts.py confirma documento/estado y snapshot idempotente juntos,
+con auditoria e indices propios. No cambia stock ni valida medicamento en Catalogo.
+Decision y limite de anulacion: [ADR](docs/ADR-PRV-RECEIPT-PERSISTENCE-001.md).
+Suite sin DB: 103 casos pasados y 12 nativos omitidos. Test-Persistence.ps1 ejecuta
+115 en replica set desechable; incluye fallo BSON y rollback real de preparacion
+y transicion, sin tocar dev. CI no ejecuta nativos ni prueba permisos por ruta.
+Faltan router/main, contrato/despliegue y aceptacion HTTP real de este clon.

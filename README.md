@@ -44,8 +44,8 @@ Decision y limites: [ADR-PRV-CORE-001](docs/ADR-PRV-CORE-001.md).
 
 app/mongo.py implementa proveedor + snapshot en una transaccion. No crea estructura:
 requiere las migraciones oficiales. Decision: [ADR-PRV-PERSISTENCE-001](docs/ADR-PRV-PERSISTENCE-001.md).
-pytest sin configuracion ejecuta 37 casos y omite cuatro nativos; CI no usa secretos.
-Para ejecutar los 41 casos con PowerShell 7, Docker y replica set desechable:
+pytest sin configuracion omite cuatro casos nativos; CI no usa secretos de DB.
+Para ejecutar tambien los nativos con PowerShell 7, Docker y replica set desechable:
 
 ```powershell
 pwsh -NoProfile -File ./tests/Test-Persistence.ps1 -InfraRoot 'D:\descargas\pago 2\mis-infra-postgres' -MongoInfraRoot 'D:\descargas\pago 2\mis-infra-mongo' -SuppliersDbRoot '<clon-oficial-mis-suppliers-db>'
@@ -54,3 +54,12 @@ pwsh -NoProfile -File ./tests/Test-Persistence.ps1 -InfraRoot 'D:\descargas\pago
 Usar el clon DB publicado que admite MIS_INFRA_MONGO_PATH. El script levanta un
 proyecto aleatorio, aplica migraciones y elimina solo sus volumenes al terminar.
 No toca datos dev/qa/main ni renueva credenciales. Aun no publica servidor HTTP.
+
+## JWT y middleware HTTP
+
+app/security.py verifica tokens con JWKS/RS256; app/middleware.py aplica correlacion
+y lectura acotada. Decision: [ADR-PRV-SECURITY-001](docs/ADR-PRV-SECURITY-001.md).
+La suite actual sin DB ejecuta 66 casos y omite cuatro nativos. Pruebas RSA temporales,
+JWKS simulado y mensajes ASGI; no afirma permisos por ruta ni JWKS remoto probado.
+No hay servidor HTTP ejecutable aun: main.py depende tambien de las recepciones,
+que se publicaran antes de integrar el servidor. El despliegue activo sigue intacto.

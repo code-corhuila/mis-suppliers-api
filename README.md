@@ -27,8 +27,7 @@ Full policy: `00-governance/branching-policy.md` in `mis-docs`.
 ## Publicacion inicial del nucleo HU-PRV-001
 
 Python 3.12. app/core.py publica validacion, normalizacion, huella y puertos sin
-importar FastAPI, MongoDB ni JWT. El servidor y las rutas HTTP de recepciones siguen
-en la preparacion local y se publicaran despues; este clon aun no ofrece HTTP.
+importar FastAPI, MongoDB ni JWT. Esa publicacion inicial no incluia servidor HTTP.
 
 ```powershell
 python -m pip install -r requirements-dev.txt
@@ -53,7 +52,7 @@ pwsh -NoProfile -File ./tests/Test-Persistence.ps1 -InfraRoot 'D:\descargas\pago
 
 Usar el clon DB publicado que admite MIS_INFRA_MONGO_PATH. El script levanta un
 proyecto aleatorio, aplica migraciones y elimina solo sus volumenes al terminar.
-No toca datos dev/qa/main ni renueva credenciales. Aun no publica servidor HTTP.
+No toca datos dev/qa/main ni renueva credenciales. Esta prueba no arranca HTTP.
 
 ## JWT y middleware HTTP
 
@@ -61,8 +60,7 @@ app/security.py verifica tokens con JWKS/RS256; app/middleware.py aplica correla
 y lectura acotada. Decision: [ADR-PRV-SECURITY-001](docs/ADR-PRV-SECURITY-001.md).
 Las pruebas de esta capa usan RSA temporales,
 JWKS simulado y mensajes ASGI; no afirma permisos por ruta ni JWKS remoto probado.
-No hay servidor HTTP ejecutable aun: main.py depende tambien de las recepciones,
-cuya publicacion se completa antes de integrar el servidor. Despliegue activo intacto.
+Las pruebas de esta capa no sustituyen la aceptacion HTTP con JWT y DB reales.
 
 ## Nucleo de recepciones
 
@@ -81,5 +79,15 @@ con auditoria e indices propios. No cambia stock ni valida medicamento en Catalo
 Decision y limite de anulacion: [ADR](docs/ADR-PRV-RECEIPT-PERSISTENCE-001.md).
 Suite sin DB: 103 casos pasados y 12 nativos omitidos. Test-Persistence.ps1 ejecuta
 115 en replica set desechable; incluye fallo BSON y rollback real de preparacion
-y transicion, sin tocar dev. CI no ejecuta nativos ni prueba permisos por ruta.
-Faltan router/main, contrato/despliegue y aceptacion HTTP real de este clon.
+y transicion, sin tocar dev. CI no ejecuta nativos ni permisos HTTP con JWT/DB reales.
+Contrato/despliegue y aceptacion HTTP real de este clon siguen pendientes.
+
+## Servidor y rutas HTTP
+
+main.py compone ambos adaptadores y JWT; receipt_api.py restringe mutaciones
+de recepciones al servicio Workflow. [Decision](docs/ADR-PRV-HTTP-001.md).
+Con migraciones aplicadas y las tres variables SUPPLIERS_* de la decision:
+`uvicorn app.main:app --host 127.0.0.1 --port 8080`.
+Suite actual: 120 passed/12 skipped sin DB; identidades y persistencia HTTP simuladas.
+TestClient emite un aviso de deprecacion, sin fallos. No se cambia el servicio activo;
+Docker/contratos y aceptacion con JWT/DB reales se publicaran en el siguiente bloque.

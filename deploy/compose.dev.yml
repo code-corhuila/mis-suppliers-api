@@ -1,0 +1,4 @@
+services:
+  suppliers:
+    ports:
+      - "127.0.0.1:58083:8080"

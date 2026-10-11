@@ -1,0 +1,22 @@
+services:
+  suppliers:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      SUPPLIERS_MONGO_HOST: mongo:27017
+      SUPPLIERS_MONGO_PASSWORD: ${MONGO_SUPPLIERS_PASSWORD:?MONGO_SUPPLIERS_PASSWORD required}
+      SUPPLIERS_JWKS_URL: http://security:8080/api/v1/auth/jwks
+    depends_on:
+      suppliers-db-migrate:
+        condition: service_completed_successfully
+      security:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health',timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 24
+      start_period: 20s
+    restart: unless-stopped
+    networks: [platform]

@@ -90,4 +90,19 @@ Con migraciones aplicadas y las tres variables SUPPLIERS_* de la decision:
 `uvicorn app.main:app --host 127.0.0.1 --port 8080`.
 Suite actual: 120 passed/12 skipped sin DB; identidades y persistencia HTTP simuladas.
 TestClient emite un aviso de deprecacion, sin fallos. No se cambia el servicio activo;
-Docker/contratos y aceptacion con JWT/DB reales se publicaran en el siguiente bloque.
+La publicacion HTTP anterior no incluia Docker ni aceptacion con JWT/DB reales.
+
+## Contratos y despliegue
+
+[Proveedores](docs/suppliers.openapi.yaml) y [recepciones](docs/receipts.openapi.yaml),
+OpenAPI 3.1. Docker multietapa/usuario 10001, sin puertos por defecto. Desde este repo:
+
+```powershell
+docker build -f deploy/Dockerfile -t mis-suppliers-check .
+docker build --target dependencies -f deploy/Dockerfile -t mis-suppliers-contracts .
+pwsh -NoProfile -File ./tests/Test-Integration.ps1 -BaseUrl '<URL-instancia-prueba>' -SecurityUrl '<URL-Seguridad>' -SecurityEnv '<env-privado-Seguridad>' -ServiceTokenPath '<JWT-Workflow-vigente>'
+```
+
+La prueba requiere instancia saludable y JWT emitido por Seguridad; no firma ni
+renueva desde Proveedores. Conserva proveedor/recepcion sinteticos (VOIDED), sin
+stock/saga completa. No usar URL productiva. [Decision](docs/ADR-PRV-DEPLOYMENT-001.md).

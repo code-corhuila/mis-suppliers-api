@@ -27,7 +27,7 @@ Full policy: `00-governance/branching-policy.md` in `mis-docs`.
 ## Publicacion inicial del nucleo HU-PRV-001
 
 Python 3.12. app/core.py publica validacion, normalizacion, huella y puertos sin
-importar FastAPI, MongoDB ni JWT. El servidor y recepciones siguen
+importar FastAPI, MongoDB ni JWT. El servidor y las capas HTTP/persistencia de recepciones siguen
 en la preparacion local y se publicaran despues; este clon aun no ofrece HTTP.
 
 ```powershell
@@ -59,7 +59,18 @@ No toca datos dev/qa/main ni renueva credenciales. Aun no publica servidor HTTP.
 
 app/security.py verifica tokens con JWKS/RS256; app/middleware.py aplica correlacion
 y lectura acotada. Decision: [ADR-PRV-SECURITY-001](docs/ADR-PRV-SECURITY-001.md).
-La suite actual sin DB ejecuta 66 casos y omite cuatro nativos. Pruebas RSA temporales,
+Las pruebas de esta capa usan RSA temporales,
 JWKS simulado y mensajes ASGI; no afirma permisos por ruta ni JWKS remoto probado.
 No hay servidor HTTP ejecutable aun: main.py depende tambien de las recepciones,
-que se publicaran antes de integrar el servidor. El despliegue activo sigue intacto.
+cuya publicacion se completa antes de integrar el servidor. Despliegue activo intacto.
+
+## Nucleo de recepciones
+
+app/receipts.py publica documento normalizado y puertos de participante para
+preparar, consultar, confirmar/anular. No contiene persistencia ni reglas de roles
+HTTP y no modifica stock. [Decision](docs/ADR-PRV-RECEIPT-CORE-001.md).
+31 casos de dominio/servicio se suman a la suite: 97 passed y cuatro nativos
+omitidos al ejecutar pytest sin DB. Las pruebas mezcladas de HTTP locales se
+publicaran con servidor/router, sin imports rotos en esta etapa.
+La identidad del servicio, estados/auditoria, idempotencia transaccional y saga
+requieren sus adaptadores y aceptacion real; este bloque no cierra HU-WFL-001.

@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info: {title: MediStock - Proveedores, version: 2.0.0}
+security: [{bearerAuth: []}]
+paths:
+  /health:
+    get:
+      security: []
+      responses: {'200': {description: Ambos adaptadores disponibles}, default: {$ref: '#/components/responses/Error'}}
+  /api/v1/suppliers:
+    get:
+      description: Cuatro roles reconocidos; pagina fuera de rango devuelve data vacia.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses: {'200': {description: Pagina, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}, default: {$ref: '#/components/responses/Error'}}
+    post:
+      description: Solo ADMIN. Normalizacion antes de huella; replay conserva respuesta original. Conflicto 409, documento ocupado 422.
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9._:-]{8,128}$'}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/NewSupplier'}}}}
+      responses: {'201': {$ref: '#/components/responses/Supplier'}, '200': {$ref: '#/components/responses/Supplier'}, default: {$ref: '#/components/responses/Error'}}
+  /api/v1/suppliers/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      description: Los cuatro roles; UUID canonico. No expone _id ni createdBy.
+      responses: {'200': {$ref: '#/components/responses/Supplier'}, default: {$ref: '#/components/responses/Error'}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT RS256}
+  responses:
+    Supplier:
+      description: Recurso; POST agrega Location (201 o replay 200).
+      headers: {Location: {schema: {type: string}}, X-Correlation-Id: {schema: {type: string}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Supplier'}}}
+    Error:
+      description: 400/401/403/404/409/422/503 y sobre comun para otros fallos.
+      headers: {X-Correlation-Id: {schema: {type: string}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+  schemas:
+    Health: {type: object, additionalProperties: false, required: [status], properties: {status: {const: UP}}}
+    NewSupplier:
+      type: object
+      additionalProperties: false
+      required: [documentNumber, name]
+      description: Texto recortado, documento ASCII normalizado a mayusculas. Opcionales omitidos son null en respuesta; no aceptar null en entrada.
+      properties:
+        documentNumber: {type: string}
+        name: {type: string}
+        phone: {type: string}
+        email: {type: string, format: email}
+        address: {type: string}
+    Supplier:
+      type: object
+      additionalProperties: false
+      required: [id, documentNumber, name, phone, email, address, active, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        documentNumber: {type: string, pattern: '^[A-Z0-9-]{1,40}$'}
+        name: {type: string, minLength: 1, maxLength: 160}
+        phone: {type: [string, 'null'], minLength: 1, maxLength: 30}
+        email: {type: [string, 'null'], maxLength: 254, format: email}
+        address: {type: [string, 'null'], minLength: 1, maxLength: 240}
+        active: {type: boolean}
+        createdAt: {type: string, format: date-time}
+    Page:
+      type: object
+      required: [data, meta]
+      properties:
+        data: {type: array, items: {$ref: '#/components/schemas/Supplier'}}
+        meta: {type: object, required: [page, limit, total, totalPages], properties: {page: {type: integer, minimum: 1}, limit: {type: integer, minimum: 1, maximum: 100}, total: {type: integer, minimum: 0}, totalPages: {type: integer, minimum: 0}}}
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error, message, traceId]
+      properties:
+        error: {type: string}
+        message: {type: string}
+        traceId: {type: string}
+        details: {type: array, items: {type: object, required: [field, message], properties: {field: {type: string}, message: {type: string}}}}

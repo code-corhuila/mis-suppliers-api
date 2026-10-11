@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info: {title: MediStock - Recepciones de Proveedores, version: 2.0.0}
+servers: [{url: 'http://127.0.0.1:8088'}]
+security: [{bearerAuth: []}]
+paths:
+  /api/v1/receipts:
+    post:
+      operationId: prepareReceipt
+      description: 'Solo JWT RS256 con service=mis-workflow y rol INVENTORY. Prepara sin alterar stock. Proveedor debe existir y estar activo; fecha posterior a hoy en America/Bogota. Una recepcion por saga y una referencia por proveedor, incluso tras anular. MedicationId es referencia externa, verificada despues por Inventario. Replay devuelve el snapshot PENDING original aunque el documento haya cambiado.'
+      parameters: [{$ref: '#/components/parameters/Key'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/NewReceipt'}}}}
+      responses:
+        '201':
+          description: Recepcion pendiente creada.
+          headers: {Location: {schema: {type: string}}, X-Correlation-Id: {schema: {type: string}}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/Receipt'}}}
+        '200': {$ref: '#/components/responses/Receipt'}
+        default: {$ref: '#/components/responses/Error'}
+  /api/v1/receipts/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      operationId: findReceipt
+      description: 'ADMIN, INVENTORY o SUPERVISOR; CONSULTATION no accede. Representacion vigente; no ejecuta transiciones.'
+      responses: {'200': {$ref: '#/components/responses/Receipt'}, default: {$ref: '#/components/responses/Error'}}
+  /api/v1/receipts/{id}/confirm:
+    parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Key'}]
+    post:
+      operationId: confirmReceipt
+      description: 'Solo identidad de workflow. PENDING a CONFIRMED; repetir CONFIRMED no cambia evidencia. VOIDED no puede confirmarse. No cambia stock.'
+      requestBody: {$ref: '#/components/requestBodies/Empty'}
+      responses: {'200': {$ref: '#/components/responses/Receipt'}, default: {$ref: '#/components/responses/Error'}}
+  /api/v1/receipts/{id}/void:
+    parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Key'}]
+    post:
+      operationId: voidReceipt
+      description: 'Solo identidad de workflow. PENDING o CONFIRMED a VOIDED, irreversible e idempotente. Conserva documento; no modifica Inventario. El orquestador debe prohibir anular tras activar la entrada y resolver resultados inciertos; esa garantia distribuida no la implementa esta API.'
+      requestBody: {$ref: '#/components/requestBodies/Empty'}
+      responses: {'200': {$ref: '#/components/responses/Receipt'}, default: {$ref: '#/components/responses/Error'}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT RS256}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {$ref: '#/components/schemas/Uuid'}}
+    Key: {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9._:-]{8,128}$'}}
+  requestBodies:
+    Empty: {required: false, content: {application/json: {schema: {type: object, additionalProperties: false, maxProperties: 0}}}}
+  responses:
+    Receipt:
+      description: Documento o snapshot de la operacion idempotente. Claves por actor/operacion; conflictos 409 y rechazos no consumen intenciones.
+      headers: {X-Correlation-Id: {schema: {type: string}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Receipt'}}}
+    Error:
+      description: '400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 NOT_FOUND, 409 IDEMPOTENCY_CONFLICT, 422 BUSINESS_RULE_VIOLATION/LOT_EXPIRED, 503 SERVICE_UNAVAILABLE; otros errores conservan el sobre comun.'
+      headers: {X-Correlation-Id: {schema: {type: string}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+  schemas:
+    Uuid: {type: string, format: uuid, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'}
+    NewReceipt:
+      type: object
+      additionalProperties: false
+      required: [supplierId, medicationId, reference, lotNumber, expiresOn, quantity, workflowId, initiatedBy]
+      properties:
+        supplierId: {$ref: '#/components/schemas/Uuid'}
+        medicationId: {$ref: '#/components/schemas/Uuid'}
+        workflowId: {$ref: '#/components/schemas/Uuid'}
+        initiatedBy: {$ref: '#/components/schemas/Uuid', description: 'Usuario verificado por el workflow; nunca se obtiene de cabeceras de roles.'}
+        reference: {type: string, description: 'Recortada y normalizada a mayusculas; ASCII alfanumerico/guion, 1 a 40 caracteres normalizados.'}
+        lotNumber: {type: string, description: 'Recortado y normalizado a mayusculas; ASCII alfanumerico/guion, 1 a 40 caracteres normalizados.'}
+        expiresOn: {type: string, format: date, description: 'Debe ser posterior a hoy en America/Bogota.'}
+        quantity: {type: integer, minimum: 1, maximum: 1000000}
+    Receipt:
+      type: object
+      additionalProperties: false
+      required: [id, supplierId, medicationId, reference, lotNumber, expiresOn, quantity, workflowId, initiatedBy, status, createdBy, createdAt, changedBy, changedAt, traceId]
+      oneOf:
+        - properties: {status: {const: PENDING}, changedBy: {type: 'null'}, changedAt: {type: 'null'}}
+        - properties: {status: {enum: [CONFIRMED, VOIDED]}, changedBy: {$ref: '#/components/schemas/Uuid'}, changedAt: {type: string, format: date-time}}
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        supplierId: {$ref: '#/components/schemas/Uuid'}
+        medicationId: {$ref: '#/components/schemas/Uuid'}
+        workflowId: {$ref: '#/components/schemas/Uuid'}
+        initiatedBy: {$ref: '#/components/schemas/Uuid'}
+        reference: {type: string, pattern: '^[A-Z0-9-]{1,40}$'}
+        lotNumber: {type: string, pattern: '^[A-Z0-9-]{1,40}$'}
+        expiresOn: {type: string, format: date}
+        quantity: {type: integer, minimum: 1, maximum: 1000000}
+        status: {type: string, enum: [PENDING, CONFIRMED, VOIDED]}
+        createdBy: {$ref: '#/components/schemas/Uuid', description: Identidad de servicio que ejecuto la preparacion.}
+        createdAt: {type: string, format: date-time}
+        changedBy: {anyOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        changedAt: {type: [string, 'null'], format: date-time}
+        traceId: {type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$'}
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error, message, traceId]
+      properties:
+        error: {type: string}
+        message: {type: string}
+        traceId: {type: string}
+        details: {type: array, items: {type: object, required: [field, message], properties: {field: {type: string}, message: {type: string}}}}
